@@ -1,0 +1,6 @@
+<div class="bg-white rounded-2xl shadow-soft border border-slate-200 p-5 flex justify-between items-center flex-wrap gap-4 relative overflow-hidden mb-6">
+    <div class="absolute right-0 top-0 w-2 h-full bg-indigo-500"></div>
+    <div class="pl-4 pr-6"><h3 class="font-black text-slate-900 text-xl flex items-center gap-2"><i class="fa-solid fa-satellite-dish text-indigo-500 animate-pulse"></i> الرادار والمراقبة اللحظية</h3><p class="text-sm font-semibold text-slate-500 mt-1">تحديث حي ومباشر للفواتير المعلقة وجاري التجهيز.</p></div>
+    <div class="relative w-full md:w-80"><span class="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400"><i class="fa-solid fa-magnifying-glass"></i></span><input type="text" id="search-suspended" oninput="window.renderSuspendedInvoices()" class="w-full pl-4 pr-11 py-3 border border-slate-200 rounded-xl outline-none font-bold bg-slate-50" placeholder="بحث برقم الفاتورة أو الموبايل..."></div>
+</div>
+<div id="suspended-invoices-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
