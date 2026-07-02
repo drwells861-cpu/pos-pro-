@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS-PRO | Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+        }
+        .shadow-soft {
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #thermal-receipt, #thermal-receipt * {
+                visibility: visible;
+            }
+            #thermal-receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-md shadow-indigo-200">
+                    <i class="fa-solid fa-cash-register text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-tight text-slate-900">نظام إدارة المبيعات والفواتير</h1>
+                    <p class="text-xs text-slate-500 font-semibold">لوحة تحكم الصلاحيات الموحدة</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                <span class="text-xs font-bold text-slate-600 px-2">دور المستخدم الحالي:</span>
+                <button onclick="window.switchRole('ADMIN')" id="btn-role-ADMIN" class="px-3 py-1.5 text-xs font-black rounded-xl transition-all bg-indigo-600 text-white shadow-sm">مدير عام</button>
+                <button onclick="window.switchRole('CUSTOMER_SERVICE')" id="btn-role-CUSTOMER_SERVICE" class="px-3 py-1.5 text-xs font-black rounded-xl transition-all text-slate-600 hover:bg-white">كول سنتر</button>
+                <button onclick="window.switchRole('BRANCH')" id="btn-role-BRANCH" class="px-3 py-1.5 text-xs font-black rounded-xl transition-all text-slate-600 hover:bg-white">فرع (101)</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        
+        <div class="flex border-b border-slate-200 gap-2">
+            <button onclick="window.switchTab('suspended-tab')" id="tab-suspended-tab" class="border-b-2 border-indigo-600 text-indigo-600 px-6 py-3 font-black text-sm flex items-center gap-2 transition-all">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>الفواتير المعلقة والواردة</span>
+                <span id="suspended-count" class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full hidden">0</span>
+            </button>
+            <button onclick="window.switchTab('demo-data-tab')" id="tab-demo-data-tab" class="border-b-2 border-transparent text-slate-500 hover:text-slate-800 px-6 py-3 font-semibold text-sm flex items-center gap-2 transition-all">
+                <i class="fa-solid fa-database"></i>
+                <span>بيانات المحاكاة والتحكم</span>
+            </button>
+        </div>
+
+        <div id="content-suspended-tab" class="tab-content space-y-6">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-soft flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="relative w-full md:w-96">
+                    <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="search-suspended" oninput="window.renderSuspendedInvoices()" placeholder="ابحث برقم الفاتورة المرجعي أو رقم الهاتف..." class="w-full pr-11 pl-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold transition-all">
+                </div>
+                <div class="text-xs text-slate-500 font-bold flex items-center gap-2 bg-slate-50 border px-3 py-2 rounded-xl">
+                    <i class="fa-solid fa-circle-info text-indigo-500"></i>
+                    <span>تخضع الأزرار المرئية والطلبات المعروضة لقواعد جدار صلاحيات الصنف المحدد أعلى الشاشة.</span>
+                </div>
+            </div>
+
+            <div id="suspended-invoices-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+        </div>
+
+        <div id="content-demo-data-tab" class="tab-content space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-soft">
+                <h3 class="font-black text-slate-900 text-base mb-2"><i class="fa-solid fa-sliders text-indigo-600 ml-2"></i>أدوات محاكاة قاعدة البيانات</h3>
+                <p class="text-xs text-slate-500 font-semibold mb-6">تستطيع إعادة شحن الفواتير التجريبية المعلقة في أي وقت لغايات فحص دقة الأداء واختلاف ظهور الأزرار.</p>
+                
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="window.seedDemoData()" class="bg-indigo-600 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow-sm hover:bg-indigo-700 transition-all">
+                        <i class="fa-solid fa-plus-circle ml-1.5"></i>إعادة تعبئة البيانات التجريبية المعلقة
+                    </button>
+                    <button onclick="window.clearAllData()" class="bg-white border text-red-600 border-red-200 text-xs font-black px-4 py-2.5 rounded-xl hover:bg-red-50 transition-all">
+                        <i class="fa-solid fa-trash ml-1.5"></i>تفريغ الفواتير المعلقة بالكامل
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="custom-prompt-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col gap-4 animate-in fade-in zoom-in duration-150">
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+                <div class="bg-amber-50 text-amber-600 p-2 rounded-xl">
+                    <i class="fa-solid fa-circle-question text-lg"></i>
+                </div>
+                <h3 class="font-black text-slate-900 text-base">تأكيد الإجراء المطلوب</h3>
+            </div>
+            <p id="custom-prompt-message" class="text-sm text-slate-600 font-semibold leading-relaxed">يرجى كتابة سبب الإجراء للمتابعة:</p>
+            <input type="text" id="custom-prompt-input" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" placeholder="اكتب هنا...">
+            <div class="flex justify-end gap-3 pt-2">
+                <button id="custom-prompt-cancel" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">إلغاء</button>
+                <button id="custom-prompt-confirm" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-sm hover:bg-indigo-700 transition-all">تأكيد ومتابعة</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="thermal-receipt" class="hidden p-4 bg-white text-black font-mono text-xs w-[80mm] mx-auto"></div>
+
+    <script>
+        // الصلاحيات والبيانات النشطة للمستخدم الافتراضي
+        window.currentUser = {
+            role: 'ADMIN', 
+            code: '101'    
+        };
+
+        // الذاكرة التخزينية للفواتير المعلقة
+        window.suspendedInvoicesData = {};
+
+        // شحن قاعدة البيانات المؤقتة ببيانات الفواتير لاختبار السيناريوهات المتقدمة
+        window.seedDemoData = function() {
+            window.suspendedInvoicesData = {
+                "INV-2026-001": {
+                    invoiceNo: "INV-2026-001",
+                    manualInvoiceNo: "PAD-7781",
+                    targetBranch: "101",
+                    status: "SUSPENDED", 
+                    editLocked: false,
+                    totalAmount: 420.00,
+                    customer: {
+                        name: "أحمد محمد العبدالله",
+                        phone: "01023456789",
+                        notes: "يرجى تسليم الطلب يداً بيد للدور الرابع"
+                    },
+                    items: [
+                        { code: "MED-091", name: "أوجمنتين 1 جرام مضاد حيوي (Augmentin)", qty: 2, total: 180.00 },
+                        { code: "MED-442", name: "بيسيلين شراب للأطفال (Besylin)", qty: 1, total: 240.00 }
+                    ]
+                },
+                "INV-2026-002": {
+                    invoiceNo: "INV-2026-002",
+                    manualInvoiceNo: "PAD-8902",
+                    targetBranch: "101",
+                    status: "PREPARING",
+                    editLocked: false,
+                    totalAmount: 150.50,
+                    customer: {
+                        name: "سارة محمود عصمت",
+                        phone: "01288776655",
+                        notes: "الرجاء تدبيس ريسيت التأمين الطبي الخارجي مع الطلب"
+                    },
+                    items: [
+                        { code: "MED-103", name: "بندول اكسترا فضي عبوة 24 قرص", qty: 3, total: 150.50 }
+                    ]
+                },
+                "INV-2026-003": {
+                    invoiceNo: "INV-2026-003",
+                    manualInvoiceNo: "PAD-1123",
+                    targetBranch: "102", 
+                    status: "SUSPENDED",
+                    editLocked: false,
+                    totalAmount: 680.00,
+                    customer: {
+                        name: "مؤسسة أبعاد اللوجستية للنقل",
+                        phone: "01511223344",
+                        notes: "طلب مباشر من الإدارة العامة لخط السير المتكامل للتوصيل"
+                    },
+                    items: [
+                        { code: "LOG-001", name: "أدوات تتبع وتحديث لوجستية للمركبات فئة أ", qty: 1, total: 680.00 }
+                    ]
+                },
+                "INV-2026-004": {
+                    invoiceNo: "INV-2026-004",
+                    manualInvoiceNo: "PAD-3450",
+                    targetBranch: "101",
+                    status: "SUSPENDED",
+                    editLocked: true, 
+                    totalAmount: 95.00,
+                    customer: {
+                        name: "كريم عبد العزيز صفوت",
+                        phone: "01144556677",
+                        notes: "هذه الفاتورة مقفلة حالياً لوجود مستخدم آخر يعدل عليها"
+                    },
+                    items: [
+                        { code: "MED-009", name: "فيتامين سي فوار 1000 ملجم مستورد", qty: 1, total: 95.00 }
+                    ]
+                }
+            };
+            window.renderSuspendedInvoices();
+        };
+
+        window.clearAllData = function() {
+            window.suspendedInvoicesData = {};
+            window.renderSuspendedInvoices();
+        };
+
+        // تبديل الأدوار الرقابية فوريًا لإعادة المعاينة للأزرار المخفية
+        window.switchRole = function(role) {
+            window.currentUser.role = role;
+            ['ADMIN', 'CUSTOMER_SERVICE', 'BRANCH'].forEach(r => {
+                const btn = document.getElementById(`btn-role-${r}`);
+                if(r === role) {
+                    btn.className = "px-3 py-1.5 text-xs font-black rounded-xl transition-all bg-indigo-600 text-white shadow-sm";
+                } else {
+                    btn.className = "px-3 py-1.5 text-xs font-black rounded-xl transition-all text-slate-600 hover:bg-white";
+                }
+            });
+            window.renderSuspendedInvoices();
+        };
+
+        // دالة إدارة التبويبات بالمستعرض
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`content-${tabId}`).classList.remove('hidden');
+            
+            document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                el.className = "border-b-2 border-transparent text-slate-500 hover:text-slate-800 px-6 py-3 font-semibold text-sm flex items-center gap-2 transition-all";
+            });
+            document.getElementById(`tab-${tabId}`).className = "border-b-2 border-indigo-600 text-indigo-600 px-6 py-3 font-black text-sm flex items-center gap-2 transition-all";
+        };
+
+        // مودال الويندوز المخصص القائم على وعود الجافا سكريبت الـ Promises لتأمين العمليات الحرجة والتأكيد
+        window.showCustomPrompt = function(message, isPassword = false) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-prompt-modal');
+                const msgEl = document.getElementById('custom-prompt-message');
+                const inputEl = document.getElementById('custom-prompt-input');
+                const confirmBtn = document.getElementById('custom-prompt-confirm');
+                const cancelBtn = document.getElementById('custom-prompt-cancel');
+
+                msgEl.textContent = message;
+                inputEl.value = '';
+                inputEl.type = isPassword ? 'password' : 'text';
+                inputEl.placeholder = isPassword ? '••••' : 'اكتب هنا...';
+                
+                modal.classList.remove('hidden');
+                setTimeout(() => inputEl.focus(), 100);
+
+                function handleConfirm() {
+                    cleanup();
+                    resolve(inputEl.value);
+                }
+
+                function handleCancel() {
+                    cleanup();
+                    resolve(null);
+                }
+
+                function handleKeyDown(e) {
+                    if (e.key === 'Enter') handleConfirm();
+                    if (e.key === 'Escape') handleCancel();
+                }
+
+                function cleanup() {
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', handleConfirm);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    inputEl.removeEventListener('keydown', handleKeyDown);
+                }
+
+                confirmBtn.onclick = handleConfirm;
+                cancelBtn.onclick = handleCancel;
+                inputEl.onkeydown = handleKeyDown;
+            });
+        };
+
+        // --- المراقبة اللحظية والطباعة بعد التعديل الشامل المطلوب لصلاحيات الكول سنتر والفرع ---
+        window.renderSuspendedInvoices = function() {
+            const container = document.getElementById('suspended-invoices-list'); if(!container) return;
+            const s = (document.getElementById('search-suspended')?.value || '').toLowerCase(); container.innerHTML = ''; let count = 0;
+            for(let id in window.suspendedInvoicesData) {
+                const inv = window.suspendedInvoicesData[id]; if(inv.status === 'SENT') continue;
+                if(window.currentUser.role === 'BRANCH' && String(inv.targetBranch) !== String(window.currentUser.code)) continue;
+                if(s && !(inv.manualInvoiceNo.toLowerCase().includes(s) || inv.customer.phone.toLowerCase().includes(s))) continue;
+                count++;
+                
+                let iHtml = inv.items.map(i => `<div class="flex flex-col text-xs border-b border-slate-100 pb-2 pt-2 text-slate-600 gap-1.5"><div class="flex justify-between items-start"><div class="flex items-center gap-1.5 font-bold"><span class="bg-slate-100 px-1.5 py-0.5 rounded">${i.code}</span></div><span class="font-black text-slate-900">${parseFloat(i.total).toFixed(2)}</span></div><div class="flex items-center gap-1.5 font-semibold"><span class="text-indigo-500 font-black">×${i.qty}</span> ${i.name}</div></div>`).join('');
+                let badg = inv.editLocked ? '<span class="bg-red-50 text-red-700 text-[10px] px-2 py-1 rounded font-black animate-pulse">قيد التعديل</span>' : inv.status === 'SUSPENDED' ? '<span class="bg-amber-50 text-amber-700 text-[10px] px-2 py-1 rounded font-black">بانتظار الاستلام</span>' : inv.status === 'PREPARING' ? '<span class="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-1 rounded font-black animate-pulse">جاري التجهيز</span>' : '<span class="bg-emerald-50 text-emerald-700 text-[10px] px-2 py-1 rounded font-black">خرج للتوصيل</span>';
+                
+                let btns = '';
+                
+                // أزرار الفروع
+                if (window.currentUser.role === 'BRANCH' || window.currentUser.role === 'ADMIN') {
+                    if(inv.editLocked) btns += `<button disabled class="bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-xl border col-span-2">مقفل للتحرير</button>`;
+                    else if(inv.status === 'SUSPENDED') btns += `<button onclick="window.updateLifecycle('${inv.invoiceNo}','PREPARE')" class="bg-indigo-600 text-white text-xs font-bold py-2 rounded-xl col-span-2">استلام وتجهيز</button>`;
+                    else if(inv.status === 'PREPARING') btns += `<button onclick="window.updateLifecycle('${inv.invoiceNo}','DELIVER')" class="bg-emerald-500 text-white text-xs font-bold py-2 rounded-xl">تسليم لطيار</button><button onclick="window.updateLifecycle('${inv.invoiceNo}','UNDO')" class="bg-white border-2 border-amber-500 text-amber-600 text-xs font-bold py-2 rounded-xl">إرجاع</button>`;
+                    else if(inv.status === 'OUT_FOR_DELIVERY') btns += `<button onclick="window.updateLifecycle('${inv.invoiceNo}','SAVE_FINAL')" class="bg-slate-800 text-white text-xs font-bold py-2 rounded-xl col-span-2">تحصيل وإغلاق</button>`;
+                }
+
+                // أزرار الكول سنتر والمدير العام
+                if (window.currentUser.role === 'CUSTOMER_SERVICE' || window.currentUser.role === 'ADMIN') {
+                    let isCS = window.currentUser.role === 'CUSTOMER_SERVICE';
+                    
+                    if(!inv.editLocked && inv.status === 'SUSPENDED') {
+                        btns += `<button onclick="window.editInv('${inv.invoiceNo}')" class="bg-blue-600 text-white text-xs font-bold py-2 rounded-xl ${isCS ? 'col-span-2' : 'mt-2'}">تعديل</button>`;
+                    } else {
+                        btns += `<button disabled class="bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-xl border ${isCS ? 'col-span-2' : 'mt-2'}">مغلق</button>`;
+                    }
+                    
+                    // زر الإلغاء يظهر فقط للمدير (ADMIN) ويختفي تماماً للكول سنتر والفرع بناءً على التعديل الجديد
+                    if (window.currentUser.role === 'ADMIN') {
+                        btns += `<button onclick="window.cancelInv('${inv.invoiceNo}')" class="bg-white border-2 border-red-200 text-red-600 text-xs font-bold py-2 rounded-xl mt-2">إلغاء</button>`;
+                    }
+                }
+
+                container.innerHTML += `<div class="bg-white rounded-2xl shadow-soft border border-slate-200 p-6 flex flex-col justify-between ${inv.editLocked?'opacity-75':''}"><div class="flex justify-between items-start border-b pb-4 mb-4"><div><span class="text-sm text-indigo-600 font-black">Ref: ${inv.manualInvoiceNo}</span><h4 class="font-black text-slate-800 text-sm mt-1">${inv.customer.name}</h4><div class="text-xs font-bold text-slate-500 mt-2">${inv.customer.phone}</div></div><div class="flex flex-col gap-2 items-end">${badg}</div></div><div class="bg-amber-50/50 p-3 rounded-xl text-xs mb-4 shadow-sm font-bold text-amber-800">${inv.customer.notes}</div><div class="space-y-1 mb-5 max-h-36 overflow-y-auto pr-2 custom-scrollbar">${iHtml}</div><div class="flex justify-between items-center bg-indigo-50/50 p-3 rounded-xl font-black text-indigo-700 text-lg mb-4">${parseFloat(inv.totalAmount).toFixed(2)} ج</div><div class="grid grid-cols-2 gap-3 pt-4 border-t">${btns}<button onclick="window.printThermalReceipt('${inv.invoiceNo}')" class="bg-slate-100 text-slate-800 text-xs font-bold py-2 rounded-xl col-span-full mt-2 border">طباعة ريسيت</button></div></div>`;
+            }
+            const b = document.getElementById('suspended-count'); if(count>0){b.innerText=count;b.classList.remove('hidden');}else b.classList.add('hidden');
+        };
+
+        // دالة ترقية مراحل دورة حياة الفاتورة المعلقة بالمطبخ أو التجهيز والفرع
+        window.updateLifecycle = async function(invoiceNo, action) {
+            const inv = window.suspendedInvoicesData[invoiceNo];
+            if(!inv) return;
+
+            if(action === 'PREPARE') {
+                inv.status = 'PREPARING';
+            } else if(action === 'DELIVER') {
+                inv.status = 'OUT_FOR_DELIVERY';
+            } else if(action === 'UNDO') {
+                inv.status = 'SUSPENDED';
+            } else if(action === 'SAVE_FINAL') {
+                inv.status = 'SENT';
+                alert(`تم تسوية وتحصيل الفاتورة ${inv.manualInvoiceNo} بنجاح نهائي.`);
+            }
+            window.renderSuspendedInvoices();
+        };
+
+        // فتح الفاتورة المعلقة للتعديل وإدراج عناصرها مجددا بجدول المبيعات
+        window.editInv = function(invoiceNo) {
+            const inv = window.suspendedInvoicesData[invoiceNo];
+            if(!inv) return;
+            alert(`تم تحويل الفاتورة المرجعية ${inv.manualInvoiceNo} إلى محرر نقطة البيع الرئيسي بنجاح.`);
+        };
+
+        // دالة إلغاء وحذف الفاتورة المقتصرة على شاشة المدير العام فقط الآن بعد تعديلك
+        window.cancelInv = async function(invoiceNo) {
+            const reason = await window.showCustomPrompt("برجاء إدخال سبب إلغاء وحذف الأوردر نهائياً من السيستم:");
+            if (reason === null) return; 
+            if (!reason.trim()) {
+                alert("الإجراء مرفوض! يجب تدوين سبب الإلغاء في سجلات المتابعة الأمنية للنظام.");
+                return;
+            }
+            delete window.suspendedInvoicesData[invoiceNo];
+            alert(`تم حذف الفاتورة وإلغاؤها بنجاح بسبب: ${reason}`);
+            window.renderSuspendedInvoices();
+        };
+
+        // دالة طباعة ريسيت الفاتورة الكاش الحراري 80 ملي متر للمطبخ أو الدليفري
+        window.printThermalReceipt = function(invoiceNo) {
+            const inv = window.suspendedInvoicesData[invoiceNo];
+            if(!inv) return;
+            
+            const receiptEl = document.getElementById('thermal-receipt');
+            let itemsText = inv.items.map(i => `${i.name}\n${i.qty} × ${parseFloat(i.total/i.qty).toFixed(2)} = ${parseFloat(i.total).toFixed(2)} ج`).join('\n----------------------\n');
+            
+            receiptEl.innerHTML = `
+                <div style="text-align: center; font-weight: bold; font-size: 14px;">إيصال تجهيز طلبية</div>
+                <div style="text-align: center;">رقم الفاتورة: ${inv.manualInvoiceNo}</div>
+                <div>--------------------------------</div>
+                <div>العميل: ${inv.customer.name}</div>
+                <div>الهاتف: ${inv.customer.phone}</div>
+                <div>الفرع المستهدف: ${inv.targetBranch}</div>
+                <div>--------------------------------</div>
+                <div style="white-space: pre-line;">${itemsText}</div>
+                <div>--------------------------------</div>
+                <div style="font-weight: bold; font-size: 14px; display: flex; justify-content: space-between;">
+                    <span>إجمالي الحساب:</span>
+                    <span>${parseFloat(inv.totalAmount).toFixed(2)} ج</span>
+                </div>
+                <div style="margin-top: 15px; text-align: center; font-size: 10px;">نظام POS-PRO لإدارة الفروع</div>
+            `;
+            window.print();
+        };
+
+        // التعبئة الفورية للبيانات بمجرد اكتمال بناء شجرة الـ DOM للمتصفح
+        window.onload = function() {
+            window.seedDemoData();
+        };
+    </script>
+</body>
+</html>
